@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>canvas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+<input type="file" class="update" id="update" value="上传图片" accept="image/*">
+<div id="btn" class="btn">识别</div>
+<div class="content">
+    <div class="pic-box">
+        <img id="up-pic" class="up-pic">
+    </div>
+    <!--<img id="mask-pic" class="mask-pic" src="../mask4_.png">-->
+    <canvas id="up-canvas" class="up-canvas"></canvas>
+</div>
+<div id="error-display">
+</div>
+<!--
+<img class="show-pic" id="show-pic"/>
+-->
+<script src="js/require.js" ></script>
+<script src="js/main.js"></script>
+<script>
+    var myCrop;
+    require(["jquery",'hammer','tomPlugin',"tomLib",'hammer.fake','hammer.showtouch'],function($,hammer,plugin,T){
+
+        var opts={cropWidth:$('.content').width(),cropHeight:$('.content').height()},
+                $file=$("#update"),//上传图片按钮
+                previewStyle={x:0,y:0,scale:1,rotate:0,ratio:1},
+                transform= T.prefixStyle("transform"),
+                $previewResult=$("#show-pic"),//合成图片展示区域
+                $previewBox=$(".pic-box"),//上传图片box
+                $getFile=$("#btn"),//确定合并按钮
+                $preview=$("#up-pic")//上传的图片
+        myCrop=T.cropImage({
+            bindFile:$file,
+            enableRatio:true,//是否启用高清,高清得到的图片会比较大
+            canvas:$("#up-canvas")[0],  //放一个canvas对象
+            cropWidth:opts.cropWidth,       //剪切大小
+            cropHeight:opts.cropHeight,
+            bindPreview:$preview,      //绑定一个预览的img标签
+            useHammer:true,            //是否使用hammer手势，否的话将不支持缩放
+            onLoad:function(data){//用户每次选择图片后执行回调
+                resetUserOpts();
+                previewStyle.ratio=data.ratio;
+                $preview.attr("src",data.originSrc).css({width:data.width,height:data.height}).css(transform,'scale('+1/previewStyle.ratio+')');
+                myCrop.setCropStyle(previewStyle)
+            }
+        })
+        function resetUserOpts(){
+            $("#up-canvas").hammer('reset');
+            previewStyle={scale:1,x:0,y:0,rotate:0};
+            $previewResult.attr("src",'');
+            $preview.attr("src",'')
+        }
+        $("#up-canvas").hammer({
+            gestureCb:function(o){//每次缩放拖拽的回调
+                $.extend(previewStyle,o);
+                //console.log("用户修改图片",previewStyle)
+                $preview.css(transform,"translate3d("+ previewStyle.x+'px,'+ previewStyle.y+"px,0) rotate("+previewStyle.rotate+"deg) scale("+(previewStyle.scale/previewStyle.ratio)+")")
+            }
+        })
+        $getFile.on("click",function(){
+            $('#error-display').html('识别中，请等待...')
+            var src;
+            //console.log(previewStyle);
+            myCrop.setCropStyle(previewStyle);
+            src=myCrop.getCropFile({});
+            $previewResult.attr("src",src);
+            //console.log(src);
+
+            //此时可上传服务器调用
+            var backValue = uploadBase64(src);
+
+            //清空画布
+            var up_canvas=document.getElementById('up-canvas');
+            var up_cxt=up_canvas.getContext("2d");
+            up_cxt.clearRect(0,0,up_canvas.width,up_canvas.height);
+
+
+        })
+        $getFile.on("touchstart",function(){
+            $('#error-display').html('识别中，请等待...')
+            var src;
+            //console.log(previewStyle);
+            myCrop.setCropStyle(previewStyle);
+            src=myCrop.getCropFile({});
+            $previewResult.attr("src",src);
+            //console.log(src);
+
+            //此时可上传服务器调用
+            var backValue = uploadBase64(src);
+
+            //清空画布
+            var up_canvas=document.getElementById('up-canvas');
+            var up_cxt=up_canvas.getContext("2d");
+            up_cxt.clearRect(0,0,up_canvas.width,up_canvas.height);
+        })
+
+        function uploadBase64(base64){
+            $(function(){
+                $.ajax({
+                    url:'/picture-similarity/similarity',
+                    type:'post',
+                    data:JSON.stringify({
+                        base64: base64
+                    }),
+                    contentType:'application/json',
+                    success:function(resp){
+                        if(resp.status == "OK" && resp.url) {
+                            // 识别成功，进行页面跳转
+                            $('#error-display').html('')
+                            window.location.assign(resp.url);
+                        } else {
+                            //alert("图片辨别失败，请换个姿势拍拍看~")
+                            $('#error-display').html('图片识别失败，请换个姿势拍拍看~')
+                        }
+                    },
+                    error:function(msg){
+                        console.log('fail')
+                        $('#error-display').html('图片识别失败，请换个姿势拍拍看~')
+                    }
+                })
+            })
+        }
+    })
+</script>
+</body>
+</html>
